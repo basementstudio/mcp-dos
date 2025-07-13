@@ -1,107 +1,80 @@
-# xmcp Application
+# MCP DOS
 
-This project was created with [create-xmcp-app](https://github.com/basementstudio/xmcp).
+A Model Context Protocol (MCP) server that opens DOS-like applications in standalone desktop windows.
 
-## Getting Started
+## Features
 
-First, run the development server:
+- **Lightweight Desktop Windows**: Uses Neutralino.js (~2MB bundle) instead of heavy Electron
+- **Full HTML/CSS/JavaScript Support**: Perfect for integrating DOSBOX.js games and applications
+- **Cross-platform**: Works on Windows, macOS, and Linux
+- **No Chrome dependency**: Uses system's native webview
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-```
+## Setup
 
-This will start the MCP server with the selected transport method.
+1. **Install Dependencies**:
+   ```bash
+   pnpm install
+   ```
 
-## Project Structure
+2. **Install Neutralino CLI globally** (required for running desktop apps):
+   ```bash
+   npm install -g @neutralinojs/neu
+   ```
 
-This project uses the structured approach where tools are automatically discovered from the `src/tools` directory. Each tool is defined in its own file with the following structure:
+3. **Build the project**:
+   ```bash
+   pnpm build
+   ```
 
-```typescript
-import { z } from "zod";
-import { type InferSchema } from "xmcp";
+## Usage
 
-// Define the schema for tool parameters
-export const schema = {
-  a: z.number().describe("First number to add"),
-  b: z.number().describe("Second number to add"),
-};
-
-// Define tool metadata
-export const metadata = {
-  name: "add",
-  description: "Add two numbers together",
-  annotations: {
-    title: "Add Two Numbers",
-    readOnlyHint: true,
-    destructiveHint: false,
-    idempotentHint: true,
-  },
-};
-
-// Tool implementation
-export default async function add({ a, b }: InferSchema<typeof schema>) {
-  return {
-    content: [{ type: "text", text: String(a + b) }],
-  };
-}
-```
-
-## Adding New Tools
-
-To add a new tool:
-
-1. Create a new `.ts` file in the `src/tools` directory
-2. Export a `schema` object defining the tool parameters using Zod
-3. Export a `metadata` object with tool information
-4. Export a default function that implements the tool logic
-
-## Building for Production
-
-To build your project for production:
+The `greet` tool demonstrates how to create a DOS-like interface in a standalone window:
 
 ```bash
-npm run build
-# or
-yarn build
-# or
-pnpm build
+# Run the MCP server
+pnpm start
+
+# The greet tool will create a DOS-style greeting window
 ```
 
-This will compile your TypeScript code and output it to the `dist` directory.
+## DOSBOX.js Integration
 
-## Running the Server
+This setup is **perfect for DOSBOX.js** applications! The generated HTML structure includes:
 
-You can run the server for the transport built with:
+- **DOS-like styling** with green terminal colors
+- **Full JavaScript support** for loading DOS games
+- **Keyboard handling** for DOS applications
+- **Standalone window** that doesn't open the user's browser
 
-- HTTP: `node dist/http.js`
-- STDIO: `node dist/stdio.js`
+### To integrate DOSBOX.js:
 
-Given the selected transport method, you will have a custom start script added to the `package.json` file.
+1. Add js-dos or dosbox.js to your HTML
+2. Create a DOS container element
+3. Load your DOS games/applications
+4. Everything runs in a true desktop window!
 
-For HTTP:
+## Why Neutralino.js?
 
-```bash
-npm run start-http
-# or
-yarn start-http
-# or
-pnpm start-http
-```
+- ✅ **Lightweight**: ~2MB vs ~100MB for Electron
+- ✅ **System webview**: No Chrome bundling
+- ✅ **True desktop apps**: Not browser tabs
+- ✅ **HTML/CSS/JS support**: Perfect for web-based DOS emulators
+- ✅ **Cross-platform**: Windows, macOS, Linux
 
-For STDIO:
+## Development
 
-```bash
-npm run start-stdio
-# or
-yarn start-stdio
-# or
-pnpm start-stdio
-```
+The main tool is in `src/tools/greet.ts`. It creates a complete Neutralino.js app structure with:
 
-## Learn More
+- `neutralino.config.json` - App configuration
+- `resources/index.html` - DOS-like interface
+- `resources/app.js` - JavaScript for DOS integration
+- Proper styling for retro DOS appearance
 
-- [xmcp Documentation](https://xmcp.dev/docs)
+## Next Steps
+
+1. **Add DOSBOX.js**: Integrate js-dos library for running DOS games
+2. **File system access**: Use Neutralino's file APIs for loading DOS files
+3. **Game library**: Create a DOS game launcher interface
+4. **Save states**: Implement game save/load functionality
+
+Perfect foundation for building a DOS gaming platform! 🎮
