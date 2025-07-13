@@ -1,9 +1,10 @@
 import { z } from "zod";
 import { type InferSchema } from "xmcp";
-import { spawn } from "child_process";
-import { writeFileSync, mkdirSync } from "fs";
-import { join } from "path";
-import { tmpdir } from "os";
+import express from "express";
+import { createServer } from "http";
+import { AddressInfo } from "net";
+import open from "open";
+import { suppressStdioAsync } from "../utils/suppress-stdio";
 
 // Define the schema for tool parameters
 export const schema = {
@@ -22,42 +23,40 @@ export const metadata = {
   },
 };
 
-function createNeutralinoApp(name: string) {
-  // Create a temporary directory for the Neutralino app
-  const tempDir = join(tmpdir(), `dosbox-greeting-${Date.now()}`);
-  mkdirSync(tempDir, { recursive: true });
+// Global server instance
+let globalServer: ReturnType<typeof createServer> | null = null;
+let serverPort: number | null = null;
 
-  // Create Neutralino config
-  const config = {
-    applicationId: "js.dosbox.greeting",
-    version: "1.0.0",
-    defaultMode: "window",
-    port: 0,
-    documentRoot: "/resources/",
-    url: "/",
-    nativeAllowList: ["*"],
-    globalVariables: {},
-    modes: {
-      window: {
-        title: `Hello ${name}!`,
-        width: 800,
-        height: 600,
-        minWidth: 600,
-        minHeight: 400,
-        center: true,
-        resizable: true,
-        exitProcessOnClose: true,
-        icon: "/resources/icon.png"
-      }
-    },
-    cli: {
-      binaryName: "dosbox-greeting",
-      resourcesPath: "/resources/"
+// Utility to find available port starting from 5555
+async function findAvailablePort(startPort: number = 5555): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const server = createServer();
+
+    function tryPort(port: number) {
+      server.listen(port, () => {
+        const actualPort = (server.address() as AddressInfo).port;
+        server.close(() => {
+          resolve(actualPort);
+        });
+      });
+
+      server.on('error', (err: any) => {
+        if (err.code === 'EADDRINUSE') {
+          // Port is busy, try next one
+          tryPort(port + 1);
+        } else {
+          reject(err);
+        }
+      });
     }
-  };
 
-  // Create a simple DOS-like interface with HTML/CSS/JavaScript
-  const htmlContent = `<!DOCTYPE html>
+    tryPort(startPort);
+  });
+}
+
+// Create HTML content for the greeting
+function createGreetingHTML(name: string): string {
+  return `<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -166,12 +165,25 @@ function createNeutralinoApp(name: string) {
             background-color: #ff0000;
             color: #000;
         }
+        
+        .dosbox-container {
+            margin-top: 30px;
+            border: 2px solid #00ff00;
+            padding: 20px;
+            background-color: rgba(0, 0, 0, 0.8);
+        }
+        
+        .dosbox-title {
+            color: #00ffff;
+            margin-bottom: 10px;
+            font-weight: bold;
+        }
     </style>
 </head>
 <body>
     <div class="dos-screen">
         <div class="terminal">
-            <button class="close-btn" onclick="closeApp()">X</button>
+            <button class="close-btn" onclick="closeWindow()">X</button>
             
             <div class="header">
                 <div class="ascii-art">
@@ -191,99 +203,98 @@ function createNeutralinoApp(name: string) {
             
             <div class="info">
                 <div>System ready.</div>
-                <div>This is a demonstration of running a DOS-like interface in a standalone window.</div>
+                <div>Express server running on port ${serverPort || 'unknown'}</div>
                 <div>Perfect for integrating DOSBOX.js games and applications!</div>
+            </div>
+            
+            <div class="dosbox-container">
+                <div class="dosbox-title">DOSBOX.js Integration Ready</div>
+                <div id="dosbox-mount">Ready to load DOS games...</div>
             </div>
             
             <div class="command-line">
                 <div><span class="prompt">C:\\></span> greet ${name}</div>
                 <div>Hello ${name}! Welcome to DOS Greeting!</div>
+                <div><span class="prompt">C:\\></span> server running on localhost:${serverPort || 'unknown'}</div>
                 <div><span class="prompt">C:\\></span> <span class="cursor">_</span></div>
             </div>
         </div>
     </div>
     
-    <script src="js/neutralino.js"></script>
     <script>
-        // Initialize Neutralino
-        Neutralino.init();
-        
-        // Handle app close
-        function closeApp() {
-            Neutralino.app.exit();
+        // Handle window close
+        function closeWindow() {
+            window.close();
         }
-        
-        // Handle window close event
-        Neutralino.events.on("windowClose", function() {
-            Neutralino.app.exit();
-        });
-        
-        // Auto-close after 10 seconds
-        setTimeout(() => {
-            closeApp();
-        }, 10000);
         
         // Add some interactivity
         document.addEventListener('keydown', function(e) {
             if (e.key === 'Escape') {
-                closeApp();
+                closeWindow();
             }
         });
+        
+        // Auto-close after 10 seconds
+        setTimeout(() => {
+            closeWindow();
+        }, 10000);
+        
+        console.log('DOS Greeting System initialized');
+        console.log('Server running on port:', ${serverPort || 'unknown'});
     </script>
 </body>
 </html>`;
+}
 
-  // Create JavaScript file for DOSBOX.js integration (placeholder)
-  const jsContent = `// DOSBOX.js Integration
-// This is where you would integrate js-dos or dosbox.js
-// Example:
-// import { Dos } from 'js-dos';
-// const dos = Dos(document.getElementById('dosbox-container'));
+// Start Express server
+async function startServer(): Promise<number> {
+  if (globalServer && serverPort) {
+    return serverPort;
+  }
 
-console.log('DOS Greeting System initialized');
+  const app = express();
+  const port = await findAvailablePort();
 
-// Future: Add DOSBOX.js integration here
-// You can load DOS games and applications in this environment
-`;
+  // Serve static content
+  app.get('/', (req, res) => {
+    const name = req.query.name as string || 'User';
+    res.send(createGreetingHTML(name));
+  });
 
-  // Write files
-  writeFileSync(join(tempDir, 'neutralino.config.json'), JSON.stringify(config, null, 2));
+  // API endpoint for different names
+  app.get('/greet/:name', (req, res) => {
+    const name = req.params.name;
+    res.send(createGreetingHTML(name));
+  });
 
-  const resourcesDir = join(tempDir, 'resources');
-  mkdirSync(resourcesDir, { recursive: true });
+  // Start server
+  globalServer = app.listen(port, () => { });
 
-  const jsDir = join(resourcesDir, 'js');
-  mkdirSync(jsDir, { recursive: true });
-
-  writeFileSync(join(resourcesDir, 'index.html'), htmlContent);
-  writeFileSync(join(resourcesDir, 'app.js'), jsContent);
-
-  return tempDir;
+  serverPort = port;
+  return port;
 }
 
 // Tool implementation
 export default async function greet({ name }: InferSchema<typeof schema>) {
   try {
-    // Create Neutralino app structure
-    const appDir = createNeutralinoApp(name);
+    const result = await suppressStdioAsync(async () => {
+      // Start server if not already running
+      const port = await startServer();
 
-    // Try to run the Neutralino app
-    // First check if neu is available globally
-    const neuCommand = process.platform === 'win32' ? 'neu.cmd' : 'neu';
+      // Open URL in Chrome
+      const url = `http://localhost:${port}/greet/${encodeURIComponent(name)}`;
+      await open(url, { app: { name: 'google chrome' } });
 
-    // Change to the app directory and run
-    const child = spawn(neuCommand, ['run'], {
-      cwd: appDir,
-      detached: true,
-      stdio: 'ignore'
+      return {
+        content: [
+          { type: "text", text: "opened window correctly" },
+          { type: "text", text: `Server running on http://localhost:${port}` },
+          { type: "text", text: `Opened: ${url}` }
+        ],
+      };
     });
 
-    // Don't wait for the child process
-    child.unref();
-
-    return {
-      content: [{ type: "text", text: "opened window correctly" }],
-    };
+    return result;
   } catch (error) {
     return {
       content: [{ type: "text", text: `Error opening window` }],
