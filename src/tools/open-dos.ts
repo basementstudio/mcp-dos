@@ -2,10 +2,10 @@ import { z } from "zod";
 import { type InferSchema } from "xmcp";
 import express from "express";
 import { createServer } from "http";
-import { AddressInfo } from "net";
 import open from "open";
 import { suppressStdioAsync } from "../utils/suppress-stdio";
 import { DOS_GAMES } from "../utils/game-utils";
+import net from 'net';
 
 // Define the schema for tool parameters
 export const schema = {
@@ -25,33 +25,32 @@ export const metadata = {
 };
 
 // Global server instance
-let globalServer: ReturnType<typeof createServer> | null = null;
-let serverPort: number | null = null;
+const setGlobalServer = (server: ReturnType<typeof createServer>) => {
+  (globalThis as any).globalServer = server;
+}
+
+const getGlobalServer = (): ReturnType<typeof createServer> | null => {
+  return (globalThis as any).globalServer;
+}
+
+const setGlobalServerPort = (port: number) => {
+  (globalThis as any).globalServerPort = port;
+}
+
+const getGlobalServerPort = (): number | null => {
+  return (globalThis as any).globalServerPort;
+}
 
 // Utility to find available port starting from 5555
 async function findAvailablePort(startPort: number = 5555): Promise<number> {
   return new Promise((resolve, reject) => {
-    const server = createServer();
-
-    function tryPort(port: number) {
-      server.listen(port, () => {
-        const actualPort = (server.address() as AddressInfo).port;
-        server.close(() => {
-          resolve(actualPort);
-        });
-      });
-
-      server.on('error', (err: any) => {
-        if (err.code === 'EADDRINUSE') {
-          // Port is busy, try next one
-          tryPort(port + 1);
-        } else {
-          reject(err);
-        }
-      });
-    }
-
-    tryPort(startPort);
+    checkPortAvailability(startPort).then((isAvailable) => {
+      if (isAvailable) {
+        resolve(startPort);
+      } else {
+        findAvailablePort(startPort + 1).then(resolve);
+      }
+    });
   });
 }
 
@@ -184,12 +183,24 @@ function createGameHTML(gameSlug: string, useCDN: boolean = false): string {
 
 // Start Express server
 async function startServer(): Promise<number> {
-  if (globalServer && serverPort) {
-    return serverPort;
+  const server = getGlobalServer();
+  const p = getGlobalServerPort();
+  if (server && p) {
+    return p;
   }
 
   const app = express();
   const port = await findAvailablePort();
+
+  app.get('/close', (req, res) => {
+    getGlobalServer()?.close();
+    res.send('Server closed');
+  });
+
+  app.post('/close', (req, res) => {
+    getGlobalServer()?.close();
+    res.send('Server closed');
+  });
 
   // Game route: /:gameSlug with optional CDN parameter
   app.get('/:gameSlug', (req, res) => {
@@ -212,11 +223,33 @@ async function startServer(): Promise<number> {
   });
 
   // Start server
-  globalServer = app.listen(port, () => { });
+  setGlobalServer(app.listen(port, () => { }));
+  setGlobalServerPort(port);
 
-  serverPort = port;
   return port;
 }
+
+const checkPortAvailability = (port: number) => {
+  const server = net.createServer();
+
+  return new Promise((resolve, reject) => {
+    server.once('error', (err) => {
+      if ('code' in err && err.code === 'EADDRINUSE') {
+        // port is currently in use
+        resolve(false);
+      } else {
+        reject(err);
+      }
+    });
+
+    server.once('listening', () => {
+      server.close();
+      resolve(true);
+    });
+
+    server.listen(port);
+  });
+};
 
 // Tool implementation
 export default async function openDos({ game }: InferSchema<typeof schema>) {
@@ -249,13 +282,19 @@ export default async function openDos({ game }: InferSchema<typeof schema>) {
       // Open URL in Chrome
       await open(useUrl, { app: { name: 'google chrome' } });
 
-      return {
+      const response = {
         content: [
           { type: "text", text: `Started ${gameInfo.title}` },
           { type: "text", text: `Game URL: ${useUrl}` },
           { type: "text", text: `Controls: ${JSON.stringify(gameInfo.keys, null, 2)}` },
         ],
       };
+
+      if (port > 5555) {
+        response.content.push({ type: "text", text: `Game servers start from port 5555. If you see that the game started on ports above 5555, it means you have older servers running. You can use the \`close-app\` tool to close them.` });
+      }
+
+      return response;
     });
 
     return result;
