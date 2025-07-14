@@ -75,6 +75,12 @@ function createGameHTML(gameSlug: string, useCDN: boolean = false): string {
   // Use CDN file if requested and available, otherwise use local file
   const gameFile = useCDN && game.cdnFile ? game.cdnFile : game.file;
 
+  // Generate key mappings display
+  const keyMappingsHTML = game.keys
+    .filter(k => k.code !== -1)
+    .map(k => `<div class="key-mapping"><kbd>${k.key}</kbd> - ${k.text || k.key}</div>`)
+    .join('');
+
   return `<!doctype html>
 <html lang="en-us">
   <head>
@@ -115,13 +121,44 @@ function createGameHTML(gameSlug: string, useCDN: boolean = false): string {
         margin: 10px 0;
         cursor: pointer;
       }
+      .controls {
+        position: absolute;
+        top: 10px;
+        left: 10px;
+        background: rgba(0, 0, 0, 0.8);
+        padding: 15px;
+        border-radius: 5px;
+        font-size: 12px;
+        max-width: 250px;
+      }
+      .key-mapping {
+        margin: 5px 0;
+      }
+      kbd {
+        background: #0f0;
+        color: #000;
+        padding: 2px 6px;
+        border-radius: 3px;
+        font-family: monospace;
+        font-size: 11px;
+      }
+      .controls h4 {
+        margin: 0 0 10px 0;
+        color: #0f0;
+      }
     </style>
   </head>
   <body>
     <div id="dosbox"></div>
     <button class="dosbox-fullscreen" onclick="dosbox.requestFullScreen();">Fullscreen</button>
+    <div class="controls">
+      <h4>Controls:</h4>
+      ${keyMappingsHTML}
+    </div>
     <script type="text/javascript" src="https://js-dos.com/cdn/js-dos-api.js"></script>
     <script type="text/javascript">
+      const keyMappings = ${JSON.stringify(game.keys)};
+      
       var dosbox = new Dosbox({
         id: "dosbox",
         onload: function (dosbox) {
@@ -129,6 +166,15 @@ function createGameHTML(gameSlug: string, useCDN: boolean = false): string {
         },
         onrun: function (dosbox, app) {
           console.log("App '" + app + "' is running");
+          
+          // Configure key mappings
+          if (dosbox.setKeyMapping) {
+            keyMappings.forEach(function(mapping) {
+              if (mapping.code !== -1) {
+                dosbox.setKeyMapping(mapping.key, mapping.code);
+              }
+            });
+          }
         }
       });
     </script>
