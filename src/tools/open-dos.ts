@@ -252,13 +252,8 @@ export default async function openDos({ game }: InferSchema<typeof schema>) {
       return {
         content: [
           { type: "text", text: `Started ${gameInfo.title}` },
-          { type: "text", text: `Server running on http://localhost:${port}` },
           { type: "text", text: `Game URL: ${useUrl}` },
-          { type: "text", text: `Local files URL: ${localUrl}` },
-          ...(gameInfo.cdnFile ? [{ type: "text", text: `CDN URL: ${cdnUrl}` }] : []),
-          { type: "text", text: `Help: http://localhost:${port}` },
-          { type: "text", text: "\nTo use local files, create an 'upload' directory and place your game ZIP files there." },
-          { type: "text", text: "Game files should be legally obtained from sources you own." }
+          { type: "text", text: `Controls: ${JSON.stringify(gameInfo.keys, null, 2)}` },
         ],
       };
     });
