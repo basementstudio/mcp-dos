@@ -2,6 +2,10 @@
 
 <a href="https://cursor.com/install-mcp?name=mcp-dos&config=ew0KICAgICAgInR5cGUiOiAic3RkaW8iLA0KICAgICAgImNvbW1hbmQiOiAibnB4IiwNCiAgICAgICJhcmdzIjogWw0KICAgICAgICAiLXkiLA0KICAgICAgICAibWNwLWRvc0BsYXRlc3QiDQogICAgICBdLA0KICAgICAgImVudiI6IHt9DQp9"><img src="https://cursor.com/deeplink/mcp-install-dark.svg" alt="Add mcp-dos MCP server to Cursor" height="32" /></a>
 
+<a href="https://glama.ai/mcp/servers/@basementstudio/mcp-dos">
+  <img width="380" height="200" src="https://glama.ai/mcp/servers/@basementstudio/mcp-dos/badge" alt="DOS - Classic DOS Gaming Server MCP server" />
+</a>
+
 A Model Context Protocol (MCP) server that provides access to classic DOS games through js-dos emulation. Play legendary games like DOOM, Super Mario, Tetris, and Duke Nukem 3D directly from your AI assistant.
 
 ## Features
